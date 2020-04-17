@@ -1,0 +1,66 @@
+
+
+#include "stm32f10xxx.h"
+
+
+#define TIMER_CLOCK_GUESS (1 << 23)        //PSC = 127 (128 - 1)
+#define TIMER_CLOCK_GUESS_2 "8 x 10^6 hz"  //PSC = 121 (122 - 1)
+
+extern u32 __start_ram[];
+
+
+__attribute__((noreturn))
+void f10xxx_reset_isr(){
+
+  __start_ram[0] = 0;
+  __start_ram[1] = 0;
+
+  f10xxx_rcc_enable_clock_apb2(iopc);
+  f10xxx_rcc_enable_clock_apb1(tim2);
+
+  f10xxx_rcc_reset_apb1(tim2);
+
+  f10xxx_gpio_configure_port(gpio_c,
+			     port_14,
+			     output_10mhz,
+			     gp_output_push_pull);
+
+  cortex_m3_enable_all_interrupts();
+
+  f10xxx_nvic_enable_irq(F10XXX_IRQ_TIMER2);
+  
+  f10xxx_timer_enable_update_interrupt(timer_2);
+  f10xxx_timer_set_autoreload(timer_2, 0xFFFF);
+  f10xxx_timer_set_prescaler(timer_2, 121);//avant (1 << 7) - 1
+  f10xxx_timer_start(timer_2, auto_reload, upcounter);
+  
+  while(1);
+}
+
+
+void f10xxx_tim2_isr(){
+
+  if(__start_ram[0] == 1){
+    if(__start_ram[1] == 9){
+      __start_ram[0] = 0;
+      __start_ram[1] = 0;
+      f10xxx_gpio_write_port(gpio_c, port_14, reset);
+    }
+    else{
+      __start_ram[1]++;
+    }
+  }
+  else{
+    if(__start_ram[1] == 4){
+      __start_ram[0] = 1;
+      __start_ram[1] = 0;
+      f10xxx_gpio_write_port(gpio_c, port_14, set);
+    }
+    else{
+      __start_ram[1]++;
+    }
+  }
+
+  f10xxx_timer_acknowledge_update_interrupt(timer_2);
+  cortex_m3_dsb();
+}

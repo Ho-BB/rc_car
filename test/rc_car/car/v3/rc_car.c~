@@ -1,0 +1,222 @@
+
+
+#include "inc/stm32f10xxx.h"
+#include "inc/pwm.h"
+#include "inc/l298n.h"
+
+extern u32 __start_ram[];
+
+/*
+  B3 = IN1 H-bridge
+  B4 = IN2 H-bridge
+  B5 = IN3 H-bridge
+  B6 = IN4 H-bridge
+  
+  B7 = Motor PWM
+
+  B9 = servo gauche
+  B8 = servo droit
+
+  A9  = TX
+  A10 = RX
+*/
+
+void f10xxx_usart1_isr();
+void f10xxx_tim2_isr();
+void f10xxx_tim3_isr();
+
+#define SERVO_CONTROL_STEP 10
+#define MOTOR_CONTROL_STEP 200
+
+#define PWM_PERIOD 4000
+
+#define PWM_MOTOR ((pwm_t *) __start_ram[0])
+#define PWM_SERVO ((pwm_t *) __start_ram[1])
+#define RIGHT_MOTOR ((l298n_t *) __start_ram[2])
+#define LEFT_MOTOR ((l298n_t *) __start_ram[3])
+
+__attribute__((noreturn))
+void f10xxx_reset_isr(){
+
+  pwm_t pwm_motor;
+  pwm_t pwm_servo;
+  l298n_t right_motor;
+  l298n_t left_motor;
+  
+  __start_ram[0] = (u32) &pwm_motor;
+  __start_ram[1] = (u32) &pwm_servo;
+  __start_ram[2] = (u32) &right_motor;
+  __start_ram[3] = (u32) &left_motor;
+
+  f10xxx_rcc_hse_on();
+  while(!f10xxx_rcc_hse_ready());
+
+  f10xxx_rcc_select_hse();
+  while(!f10xxx_rcc_hse_selected());
+
+  f10xxx_rcc_enable_clock_apb1(tim2);
+  f10xxx_rcc_enable_clock_apb1(tim3);
+  f10xxx_rcc_enable_clock_apb2(usart1);
+  f10xxx_rcc_enable_clock_apb2(afio);
+  f10xxx_rcc_enable_clock_apb2(iopb);
+  f10xxx_rcc_enable_clock_apb2(iopa);
+  f10xxx_rcc_enable_clock_apb2(iopc);
+  
+  f10xxx_rcc_reset_apb1(tim2);
+  f10xxx_rcc_reset_apb1(tim3);
+  f10xxx_rcc_reset_apb2(usart1);
+
+  cortex_m3_enable_all_interrupts();
+
+  f10xxx_nvic_enable_irq(F10XXX_IRQ_TIMER2);
+  f10xxx_nvic_enable_irq(F10XXX_IRQ_TIMER3);
+  f10xxx_nvic_enable_irq(F10XXX_IRQ_USART1);
+
+  f10xxx_usart_enable_irq(usart_1, rx_not_empty_irq);
+  f10xxx_timer_enable_update_interrupt(timer_2);
+  f10xxx_timer_enable_update_interrupt(timer_3);
+
+  //led conf
+  f10xxx_gpio_configure_port(gpio_c,
+			     port_13,
+			     output_10mhz,
+			     gp_output_push_pull);
+
+  f10xxx_gpio_write_port(gpio_c, port_13, set);
+  
+  //Servo ports conf
+  f10xxx_gpio_configure_port(gpio_b,
+			     port_9,
+			     output_10mhz,
+			     gp_output_push_pull);
+  f10xxx_gpio_configure_port(gpio_b,
+			     port_8,
+			     output_10mhz,
+			     gp_output_push_pull);
+
+  //usart ports conf
+  f10xxx_gpio_configure_port(gpio_a,
+			     port_9,
+			     output_50mhz,
+			     af_output_push_pull);
+  f10xxx_gpio_configure_port(gpio_a,
+			     port_10,
+			     input,
+			     input_floating);
+
+  //usart conf
+  f10xxx_usart_start(usart_1,
+		     B9600,
+		     data8_parity0,
+		     even,
+		     stop1);
+
+  pwm_init(&pwm_motor, timer_3, 4000, 500);
+  pwm_init(&pwm_servo, timer_2, 20000, 1500);
+
+  l298n_init(&left_motor,
+	     gpio_b,
+	     port_0,
+	     gpio_b,
+	     port_3,
+	     gpio_b,
+	     port_4,
+	     l298n_way2_e);
+  
+  l298n_init(&right_motor,
+	     gpio_b,
+	     port_7,
+	     gpio_b,
+	     port_5,
+	     gpio_b,
+	     port_6,
+	     l298n_way1_e);
+
+  pwm_step(&pwm_motor);
+  pwm_step(&pwm_servo);
+
+  f10xxx_gpio_write_port(gpio_c, port_13, reset);
+  
+  while(1);
+}
+
+
+void f10xxx_usart1_isr(){
+
+  u32 c = f10xxx_usart_read(usart_1);
+
+  if(c == 'a'){
+    pwm_set_pulse(PWM_SERVO, PWM_SERVO->high + SERVO_CONTROL_STEP);
+  }
+  else if(c == 'e'){
+    pwm_set_pulse(PWM_SERVO, PWM_SERVO->high - SERVO_CONTROL_STEP);
+  }
+  else if(c == 'q'){
+    pwm_set_pulse(PWM_MOTOR, PWM_MOTOR->high + MOTOR_CONTROL_STEP);
+  }
+  else if(c == 'd'){
+    pwm_set_pulse(PWM_MOTOR, PWM_MOTOR->high - MOTOR_CONTROL_STEP);
+  }
+  else if(c == 'o'){
+    l298n_way1(RIGHT_MOTOR);
+    l298n_way2(LEFT_MOTOR);
+  }
+  else if(c == 'p'){
+    l298n_way2(RIGHT_MOTOR);
+    l298n_way1(LEFT_MOTOR);
+  }
+}
+
+void f10xxx_tim2_isr(){
+
+  pwm_step(PWM_SERVO);
+
+  switch(PWM_SERVO->state){
+  case pwm_state_high :
+    f10xxx_gpio_write_port(gpio_b, port_9, set);
+    f10xxx_gpio_write_port(gpio_b, port_8, set);
+    break;
+  case pwm_state_always_high :
+    f10xxx_gpio_write_port(gpio_b, port_9, set);
+    f10xxx_gpio_write_port(gpio_b, port_8, set);
+    break;
+  case pwm_state_low :
+    f10xxx_gpio_write_port(gpio_b, port_9, reset);
+    f10xxx_gpio_write_port(gpio_b, port_8, reset);
+    break;
+  case pwm_state_always_low :
+    f10xxx_gpio_write_port(gpio_b, port_9, reset);
+    f10xxx_gpio_write_port(gpio_b, port_8, reset);
+    break;
+  }
+
+  f10xxx_timer_acknowledge_update_interrupt(timer_2);
+  cortex_m3_dsb();
+}
+
+void f10xxx_tim3_isr(){
+
+  pwm_step(PWM_MOTOR);
+
+  switch(PWM_MOTOR->state){
+  case pwm_state_high :
+    l298n_en_high(RIGHT_MOTOR);
+    l298n_en_high(LEFT_MOTOR);
+    break;
+  case pwm_state_always_high :
+    l298n_en_high(RIGHT_MOTOR);
+    l298n_en_high(LEFT_MOTOR);
+    break;
+  case pwm_state_low :
+    l298n_en_low(RIGHT_MOTOR);
+    l298n_en_low(LEFT_MOTOR);
+    break;
+  case pwm_state_always_low :
+    l298n_en_low(RIGHT_MOTOR);
+    l298n_en_low(LEFT_MOTOR);
+    break;
+  }
+
+  f10xxx_timer_acknowledge_update_interrupt(timer_3);
+  cortex_m3_dsb();
+}

@@ -1,0 +1,89 @@
+
+
+#ifndef __F10XXX_TIMER__
+#define __F10XXX_TIMER__
+
+#include "inc/stdinclude.h"
+
+
+//__attribute__((packed))
+typedef struct f10xxx_timer{
+  u32 CR1;
+  u32 CR2;
+  u32 SMCR;
+  u32 DIER;
+  u32 SR;
+  u32 EGR;
+  u32 CCMR1;
+  u32 CCMR2;
+  u32 CCER;
+  u32 CNT;
+  u32 PSC;
+  u32 ARR;
+  u32 not_used_1;
+  u32 CCR1;
+  u32 CCR2;
+  u32 CCR3;
+  u32 CCR4;
+  u32 not_used_2;
+  u32 DCR;
+  u32 DMAR;
+} f10xxx_timer_t;
+
+
+extern volatile f10xxx_timer_t *timer_2;
+extern volatile f10xxx_timer_t *timer_3;
+extern volatile f10xxx_timer_t *timer_4;
+
+
+typedef enum f10xxx_timer_mode
+  {
+   one_pulse = 1 << 3,
+   auto_reload = 0
+  }f10xxx_timer_mode_e;
+
+typedef enum f10xxx_timer_dir
+  {
+   upcounter = 0,
+   downcounter = 1 << 4
+  }f10xxx_timer_dir_e;
+
+
+void f10xxx_timer_start(volatile f10xxx_timer_t *timer_x,
+			f10xxx_timer_mode_e mode,
+			f10xxx_timer_dir_e dir);
+
+void f10xxx_timer_stop(volatile f10xxx_timer_t *timer_x);
+
+u32 f10xxx_timer_is_running(volatile f10xxx_timer_t *timer_x);
+
+void f10xxx_timer_set_counter(volatile f10xxx_timer_t *timer_x, u16 counter);
+u16 f10xxx_timer_get_counter(volatile f10xxx_timer_t *timer_x);
+
+void f10xxx_timer_set_prescaler(volatile f10xxx_timer_t *timer_x,
+				u16 prescaler);
+u16 f10xxx_timer_get_prescaler(volatile f10xxx_timer_t *timer_x);
+
+void f10xxx_timer_set_autoreload(volatile f10xxx_timer_t *timer_x,
+				 u16 autoreload);
+u16 f10xxx_timer_get_autoreload(volatile f10xxx_timer_t *timer_x);
+
+void f10xxx_timer_generate_update(volatile f10xxx_timer_t *timer_x);
+
+void f10xxx_timer_enable_update_interrupt(volatile f10xxx_timer_t *timer_x);
+void f10xxx_timer_disable_update_interrupt(volatile f10xxx_timer_t *timer_x);
+
+void
+f10xxx_timer_acknowledge_update_interrupt(volatile f10xxx_timer_t *timer_x);
+
+u32 f10xxx_timer_update_interrupt_pending(volatile f10xxx_timer_t *timer_x);
+
+//conversion utils
+
+u32 f10xxx_timer_us_to_ticks(u32 clk_hz, u32 us);
+u32 f10xxx_timer_ticks_to_us(u32 clk_hz, u32 ticks);
+
+u32 f10xxx_timer_split_ticks(u32 ticks); // returns (counter << 16) | prescaler
+
+
+#endif

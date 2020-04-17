@@ -1,0 +1,43 @@
+
+
+#include "inc/nrf24l01.h"
+
+
+void nrf24l01_init(nrf24l01_t *rf,
+		   volatile f10xxx_spi_t *const spi_x,
+		   
+		   volatile f10xxx_gpio_t *nss_gpio,
+		   f10xxx_gpio_port_e nss_port,
+		   
+		   volatile f10xxx_gpio_t *sck_gpio,
+		   f10xxx_gpio_port_e sck_port,
+
+		   volatile f10xxx_gpio_t *miso_gpio,
+		   f10xxx_gpio_port_e miso_port,
+
+		   volatile f10xxx_gpio_t *mosi_gpio,
+		   f10xxx_gpio_port_e mosi_port,
+
+		   volatile f10xxx_gpio_t *ce_gpio,
+		   f10xxx_gpio_port_e ce_port);
+
+void nrf24l01_configure_rx(nrf24l01_t *rf);
+
+void nrf24l01_configure_tx(nrf24l01_t *rf);
+
+void nrf24l01_read(nrf24l01_t *rf,
+		   u8 cmd,
+		   u8 *buf,
+		   u32 len);
+
+void nrf24l01_write(nrf24l01_t *rf,
+		    u8 cmd,
+		    u8 *buf,
+		    u32 len);
+
+void nrf24l01_write_tx(nrf24l01_t *rf,
+		       u8 *buf,
+		       u32 len);
+
+void nrf24l01_ce_high(nrf24l01_t *rf);
+void nrf24l01_ce_low(nrf24l01_t *rf);

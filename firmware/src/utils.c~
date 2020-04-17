@@ -1,0 +1,22 @@
+
+
+#include "inc/utils.h"
+
+
+void usart_write_strn(volatile f10xxx_usart_t *usart_x,
+		      u8 *str,
+		      u32 n);
+
+void usart_write_byte(volatile f10xxx_usart_t *usart_x,
+		      u8 byte);
+
+void usart_setup_usart_1();
+
+u8 ascii_hex_digit(u8 quartet){
+
+  quartet &= 0x0F;
+  if(quartet < 10)
+    return quartet + 48;
+  else
+    return quartet + 55;
+}

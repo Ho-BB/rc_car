@@ -1,0 +1,8 @@
+
+
+#ifndef __F10XXX_AFIO__
+#define __F10XXX_AFIO__
+
+#include "inc/stdinclude.h"
+
+#endif

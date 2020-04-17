@@ -1,0 +1,11 @@
+
+
+#ifndef __CORTEX_M3__
+#define __CORTEX_M3__
+
+
+void cortex_m3_enable_all_interrupts();
+
+void cortex_m3_dsb();
+
+#endif

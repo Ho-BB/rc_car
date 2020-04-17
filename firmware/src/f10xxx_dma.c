@@ -1,0 +1,107 @@
+
+
+#include "inc/f10xxx_dma.h"
+
+
+volatile f10xxx_dma_t *const dma = (f10xxx_dma_t *const) 0x40020000;
+
+volatile f10xxx_dma_channel_t *const dma_channel_1 =
+  (f10xxx_dma_channel_t *const) 0x40020008;
+volatile f10xxx_dma_channel_t *const dma_channel_2 =
+  (f10xxx_dma_channel_t *const) 0x4002001C;
+volatile f10xxx_dma_channel_t *const dma_channel_3 =
+  (f10xxx_dma_channel_t *const) 0x40020030;
+volatile f10xxx_dma_channel_t *const dma_channel_4 =
+  (f10xxx_dma_channel_t *const) 0x40020044;
+volatile f10xxx_dma_channel_t *const dma_channel_5 =
+  (f10xxx_dma_channel_t *const) 0x40020058;
+volatile f10xxx_dma_channel_t *const dma_channel_6 =
+  (f10xxx_dma_channel_t *const) 0x4002006C;
+volatile f10xxx_dma_channel_t *const dma_channel_7 =
+  (f10xxx_dma_channel_t *const) 0x40020080;
+
+
+void f10xxx_dma_set_memory_address
+(volatile f10xxx_dma_channel_t *const dma_channel_x,
+ u32 address){
+
+  dma_channel_x->CMAR = address;
+}
+
+void f10xxx_dma_set_peripheral_address
+(volatile f10xxx_dma_channel_t *const dma_channel_x,
+ u32 address){
+
+  dma_channel_x->CPAR = address;
+}
+
+void f10xxx_dma_set_number_of_data
+(volatile f10xxx_dma_channel_t *const dma_channel_x,
+ u16 num_data){
+
+  dma_channel_x->CNDTR = num_data;
+}
+
+void f10xxx_dma_enable_irq
+(volatile f10xxx_dma_channel_t *const dma_channel_x,
+ f10xxx_dma_irq_e irq){
+
+  if(irq != global_irq)
+    dma_channel_x->CCR = dma_channel_x->CCR | (u32) irq;
+  else
+    dma_channel_x->CCR = dma_channel_x->CCR | (u32) 14;
+}
+
+void f10xxx_dma_disable_irq
+(volatile f10xxx_dma_channel_t *const dma_channel_x,
+ f10xxx_dma_irq_e irq){
+
+  if(irq != global_irq)
+    dma_channel_x->CCR = dma_channel_x->CCR & ~((u32) irq);
+  else
+    dma_channel_x->CCR = dma_channel_x->CCR & ~((u32) 14);
+}
+
+void f10xxx_dma_enable
+(volatile f10xxx_dma_channel_t *const dma_channel_x,
+ f10xxx_dma_transfer_direction_e direction,
+ f10xxx_dma_circular_mode_e circular_mode,
+ f10xxx_dma_peripheral_increment_mode_e p_inc_mode,
+ f10xxx_dma_memory_increment_mode_e m_inc_mode,
+ f10xxx_dma_data_size_e peripheral_data_size,
+ f10xxx_dma_data_size_e memory_data_size,
+ f10xxx_dma_channel_priority_e channel_priority,
+ f10xxx_dma_memory_mode_e memory_mode){
+
+  dma_channel_x->CCR =
+    (dma_channel_x->CCR &
+     ~((31 << 10) | (63 << 4) | 1)
+     )
+    |  (u32) memory_mode
+    |  (u32) channel_priority
+    | ((u32) memory_data_size << 10)
+    | ((u32) peripheral_data_size << 8)
+    |  (u32) m_inc_mode
+    |  (u32) p_inc_mode
+    |  (u32) circular_mode
+    |  (u32) direction
+    |  (u32) 1;
+}
+
+void f10xxx_dma_disable
+(volatile f10xxx_dma_channel_t *const dma_channel_x){
+
+  dma_channel_x->CCR = dma_channel_x->CCR & ~((u32) 1);
+}
+
+u32 f10xxx_dma_irq_status(f10xxx_dma_chan_e dma_chan,
+			  f10xxx_dma_irq_e irq){
+
+  return dma->ISR & ((u32) irq << (u32) dma_chan);
+}
+
+void f10xxx_dma_irq_acknowledge(f10xxx_dma_chan_e dma_chan,
+				f10xxx_dma_irq_e irq){
+
+  dma->IFCR = (u32) irq << (u32) dma_chan;
+}

@@ -1,0 +1,22 @@
+
+
+#include "inc/stdinclude.h"
+#include "inc/f10xxx_nvic.h"
+
+volatile f10xxx_nvic_t *nvic = (f10xxx_nvic_t *) 0xE000E004;
+
+
+void f10xxx_nvic_enable_irq(u8 irq){
+
+  nvic->ISER[irq >> 5] = 1 << (irq & 0x1F);
+}
+
+void f10xxx_nvic_disable_irq(u8 irq){
+
+  nvic->ICER[irq >> 5] = 1 << (irq & 0x1F);
+}
+
+void f10xxx_nvic_trigger_irq(u8 irq){
+
+  nvic->STIR = irq;
+}

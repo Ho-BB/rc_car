@@ -1,0 +1,91 @@
+
+
+#include "inc/f10xxx_spi.h"
+
+
+volatile f10xxx_spi_t *const spi_1 = (volatile f10xxx_spi_t *const) 0x40013000;
+volatile f10xxx_spi_t *const spi_2 = (volatile f10xxx_spi_t *const) 0x40003800;
+
+
+void f10xxx_spi_enable_irq(volatile f10xxx_spi_t *const spi_x,
+			   f10xxx_spi_irq_e irq){
+
+  spi_x->CR2 = spi_x->CR2 | (u32) irq;
+}
+
+void f10xxx_spi_disable_irq(volatile f10xxx_spi_t *const spi_x,
+			    f10xxx_spi_irq_e irq){
+
+  spi_x->CR2 = spi_x->CR2 & ~((u32) irq);
+}
+
+void f10xxx_spi_enable_dma(volatile f10xxx_spi_t *const spi_x,
+			   f10xxx_spi_dma_e dma){
+
+  spi_x->CR2 = spi_x->CR2 | (u32) dma;
+}
+
+void f10xxx_spi_disable_dma(volatile f10xxx_spi_t *const spi_x,
+			    f10xxx_spi_dma_e dma){
+
+  spi_x->CR2 = spi_x->CR2 & ~((u32) dma);
+}
+
+u32 f10xxx_spi_status(volatile f10xxx_spi_t *const spi_x,
+		      f10xxx_spi_status_e status){
+
+  return spi_x->SR & (u32) status;
+}
+
+void f10xxx_spi_enable(volatile f10xxx_spi_t *const spi_x,
+		       f10xxx_spi_num_lines_e num_lines,
+		       f10xxx_spi_crc_mode_e crc_mode,
+		       f10xxx_spi_frame_format_e frame_format,
+		       f10xxx_spi_bit_endianess_e bit_endianess,
+		       f10xxx_spi_clock_div_e clock_div,
+		       f10xxx_spi_mode_e spi_mode,
+		       f10xxx_spi_clock_pol_pha_e clock_pol_pha){
+
+  spi_x->CR1 =
+    (u32) num_lines
+    | (u32) crc_mode
+    | (u32) frame_format
+    | (u32) bit_endianess
+    | (u32) clock_div
+    | (u32) spi_mode
+    | (u32) clock_pol_pha
+    | (u32) (1 << 6);
+}
+
+void f10xxx_spi_simple_enable(volatile f10xxx_spi_t *const spi_x){
+
+  spi_x->CR1 = spi_x->CR1 | (u32) (1 << 6);
+}
+
+void f10xxx_spi_disable(volatile f10xxx_spi_t *const spi_x){
+
+  while(!(spi_x->SR & 2));
+  while(spi_x->SR & 128);
+  spi_x->CR1 = spi_x->CR1 & ~((u32) 64);
+}
+
+void f10xxx_spi_enable_ss_output(volatile f10xxx_spi_t *const spi_x){
+
+  spi_x->CR2 = spi_x->CR2 | 4;
+}
+
+void f10xxx_spi_disable_ss_output(volatile f10xxx_spi_t *const spi_x){
+
+  spi_x->CR2 = spi_x->CR2 & ~((u32) 4);
+}
+
+u16 f10xxx_spi_read(volatile f10xxx_spi_t *const spi_x){
+
+  return (u16) spi_x->DR;
+}
+
+void f10xxx_spi_write(volatile f10xxx_spi_t *const spi_x,
+		      u16 data){
+
+  spi_x->DR = data;
+}

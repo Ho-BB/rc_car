@@ -1,0 +1,9 @@
+
+
+#include "inc/f10xxx_afio.h"
+
+
+void f10xxx_afio_disable_jtag(){
+
+  
+}

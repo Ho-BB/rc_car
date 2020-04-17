@@ -1,0 +1,134 @@
+
+
+#include "inc/f10xxx_usart.h"
+
+
+volatile f10xxx_usart_t *usart_1 = (f10xxx_usart_t *) 0x40013800;
+volatile f10xxx_usart_t *usart_2 = (f10xxx_usart_t *) 0x40004400;
+volatile f10xxx_usart_t *usart_3 = (f10xxx_usart_t *) 0x40004800;
+
+
+void f10xxx_usart_start(volatile f10xxx_usart_t *usart_x,
+			f10xxx_usart_baud_rate_e baud_rate,
+			f10xxx_usart_frame_format_e frame_format,
+			f10xxx_usart_parity_e parity,
+			f10xxx_usart_stop_bits_e stop_bits){
+
+  u32 m_pce;
+  
+  //UE in CR1
+  usart_x->CR1 = usart_x->CR1 | (1 << 13);
+  
+  //M in CR1 + PCE in CR1 + PS in CR1
+  switch(frame_format){
+  case data8_parity0 :
+    m_pce = 0;
+    break;
+  case data7_parity1 :
+    m_pce = 1 << 10;
+    break;
+  case data9_parity0 :
+    m_pce = 4 << 10;
+    break;
+  case data8_parity1 :
+    m_pce = 5 << 10;
+    break;
+  }
+  
+  usart_x->CR1 =
+    (usart_x->CR1 & ~((1 << 9) | (1 << 10) | (1 << 12))) | m_pce | (u32) parity;
+    
+  //STOP BITS in CR2
+  usart_x->CR2 = (usart_x->CR2 & ~(3 << 12)) | (u32) stop_bits;
+  
+  //BAUD RATE IN BRR (CHECK CLOCKS!) ASSUMES 8MHZ FOR NOW
+  switch(baud_rate){
+  case B9600 :
+    usart_x->BRR = (52 << 4) | 1;//52,08333333333
+                   //(52 + 0.625 = 52.0625 is the closest I can get)
+    break;
+  }
+  
+  //TE (and RE) in CR1
+  usart_x->CR1 = usart_x->CR1 | (3 << 2);
+}
+
+u32 f10xxx_usart_read(volatile f10xxx_usart_t *usart_x){
+
+  return usart_x->DR;
+}
+
+void f10xxx_usart_write(volatile f10xxx_usart_t *usart_x,
+			u32 data){
+
+  usart_x->DR = data;
+}
+
+f10xxx_usart_status_e f10xxx_usart_status(volatile f10xxx_usart_t *usart_x){
+
+  u32 sr = usart_x->SR;
+  
+  if(sr & (u32) rx_not_empty)
+    return rx_not_empty;
+
+  if(sr & (u32) tx_empty)
+    return tx_empty;
+
+  if(sr & (u32) transmission_complete)
+    return transmission_complete;
+
+  if(sr & (u32) parity_error)
+    return parity_error;
+
+  if(sr & (u32) frame_error)
+    return frame_error;
+
+  if(sr & (u32) noise_error)
+    return noise_error;
+
+  if(sr & (u32) overrun_error)
+    return overrun_error;
+
+  if(sr & (u32) idle_line)
+    return idle_line;
+
+  if(sr & (u32) lin_break)
+    return lin_break;
+
+  if(sr & (u32) cts)
+    return cts;
+
+  return no_status;
+}
+
+void f10xxx_usart_enable_irq(volatile f10xxx_usart_t *usart_x,
+			     f10xxx_usart_irq_e irq){
+
+  if(irq == frame_error_irq){
+    usart_x->CR3 = usart_x->CR3 | (u32) frame_error_irq;
+  }
+  else{
+    usart_x->CR1 = usart_x->CR1 | (u32) irq;
+  }
+}
+
+void f10xxx_usart_disable_irq(volatile f10xxx_usart_t *usart_x,
+			      f10xxx_usart_irq_e irq){
+
+  if(irq == frame_error_irq){
+    usart_x->CR3 = usart_x->CR3 & ~((u32) frame_error_irq);
+  }
+  else{
+    usart_x->CR1 = usart_x->CR1 & ~((u32) irq);
+  }
+}
+
+u32 f10xxx_usart_tx_empty(volatile f10xxx_usart_t *usart_x){
+
+  return (usart_x->SR >> 7) & 1;
+}
+
+u32 f10xxx_usart_rx_not_empty(volatile f10xxx_usart_t *usart_x){
+
+  return (usart_x->SR >> 5) & 1;
+}

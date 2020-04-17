@@ -1,0 +1,40 @@
+
+
+#ifndef __NRF24L01__
+#define __NRF24L01__
+
+
+#include "inc/stdinclude.h"
+#include "inc/f10xxx_spi.h"
+
+void nrf24l01_write_cmd(volatile f10xxx_spi_t *const spi_x,
+			u8 cmd, u8 *buf, u32 len, u8 *status);
+void nrf24l01_read_cmd(volatile f10xxx_spi_t *const spi_x,
+		       u8 cmd, u8 *buf, u32 len);
+
+/* configure spi_x to communicate with nrf24l01
+*/
+void nrf24l01_configure_spi(volatile f10xxx_spi_t *const spi_x);
+
+/* configure nrf24l01
+*/
+void nrf24l01_simple_configure_rx(volatile f10xxx_spi_t *const spi_x);
+
+void nrf24l01_simple_configure_tx(volatile f10xxx_spi_t *const spi_x);
+
+/* polls the nrf24l01 until some data is available and writes it in buf,
+   returns the number of bytes received (max 32, so buf should point to at least
+   32 bytes of free memory
+*/
+u32 nrf24l01_receive_poll(volatile f10xxx_spi_t *const spi_x,
+			  u8 *buf);
+
+/* polls the nrf24l01 until data can be sent then sends the data contained in
+   buf and of length len (max 32, 0 is an error too).
+*/
+void nrf24l01_send_poll(volatile f10xxx_spi_t *const spi_x,
+			u8 *buf,
+			u32 len);
+
+
+#endif

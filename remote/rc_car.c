@@ -1,0 +1,148 @@
+
+
+#include "inc/stm32f10xxx.h"
+#include "inc/nrf24l01.h"
+#include "inc/utils.h"
+
+extern u32 __start_ram[];
+
+#define I __start_ram[0]
+#define RF ((nrf24l01_t *) __start_ram[1])
+#define BUF ((u8 *) &__start_ram[2])
+#define LED __start_ram[3]
+
+__attribute__((noreturn))
+void f10xxx_reset_isr(){
+
+  nrf24l01_t rf;
+
+  I = 0;
+  __start_ram[1] = (u32) &rf;
+  BUF[0] = 128;
+  BUF[1] = 128;
+  BUF[2] = 0;
+  LED = 0;
+  
+  f10xxx_rcc_hse_on();
+  while(!f10xxx_rcc_hse_ready());
+
+  f10xxx_rcc_select_hse();
+  while(!f10xxx_rcc_hse_selected());
+
+  f10xxx_rcc_enable_clock_apb2(spi1);
+  f10xxx_rcc_enable_clock_apb1(tim2);
+  f10xxx_rcc_enable_clock_apb2(adc1);
+  f10xxx_rcc_enable_clock_apb2(afio);
+  f10xxx_rcc_enable_clock_apb2(iopa);
+  f10xxx_rcc_enable_clock_apb2(iopc);
+  
+  f10xxx_rcc_reset_apb2(spi1);
+  f10xxx_rcc_reset_apb1(tim2);
+  f10xxx_rcc_reset_apb2(adc1);
+  f10xxx_adc_simple_init(adc_1);
+
+  usart_setup_usart_1();//to remove
+
+  cortex_m3_enable_all_interrupts();
+
+  f10xxx_nvic_enable_irq(F10XXX_IRQ_ADC1_2);
+  f10xxx_nvic_enable_irq(F10XXX_IRQ_TIMER2);
+  
+  //led conf
+  f10xxx_gpio_configure_port(gpio_c,
+			     port_13,
+			     output_10mhz,
+			     gp_output_push_pull);
+
+  f10xxx_gpio_write_port(gpio_c, port_13, reset);
+
+  f10xxx_gpio_configure_port(gpio_a,
+			     port_0,
+			     input,
+			     input_analog);
+  f10xxx_gpio_configure_port(gpio_a,
+			     port_1,
+			     input,
+			     input_analog);
+
+  f10xxx_adc_enable_eoc_irq(adc_1);
+  f10xxx_adc_enable_discontinuous(adc_1, 1);
+  f10xxx_adc_enable_software_trigger(adc_1);
+  f10xxx_adc_regular_sequence_length(adc_1, 2);
+  f10xxx_adc_set_channel_position(adc_1, 0, adc_channel_0);
+  f10xxx_adc_set_channel_position(adc_1, 1, adc_channel_1);
+
+  nrf24l01_init(&rf,
+		spi_1,
+		gpio_a,
+		port_4,
+		gpio_a,
+		port_5,
+		gpio_a,
+		port_6,
+		gpio_a,
+		port_7,
+		gpio_a,
+		port_3);
+
+  nrf24l01_configure_tx(&rf);
+
+  u32 i;
+  i = 1000000;
+  while(i--);//ADC requires to wait before the first trigger (apparently)
+
+  f10xxx_timer_set_prescaler(timer_2, 15);
+  f10xxx_timer_set_autoreload(timer_2, 50000);
+  f10xxx_timer_enable_update_interrupt(timer_2);
+  f10xxx_timer_start(timer_2, one_pulse, upcounter);
+  
+  while(1);
+}
+
+void f10xxx_tim2_isr(){
+
+  if(LED == 1){
+    LED = 0;
+    f10xxx_gpio_write_port(gpio_c, port_13, reset);
+  }
+  else{
+    LED = 1;
+    f10xxx_gpio_write_port(gpio_c, port_13, set);
+  }
+
+  f10xxx_adc_trigger(adc_1);
+  
+  f10xxx_timer_acknowledge_update_interrupt(timer_2);
+  cortex_m3_dsb();
+}
+
+void f10xxx_adc1_2_isr(){
+  
+  BUF[I] = f10xxx_adc_get_regular_value(adc_1) >> 4;
+
+  if(I == 0){
+    I = 1;
+    
+    f10xxx_adc_trigger(adc_1);
+  }
+  else{
+    I = 0;
+
+    usart_write_str(usart_1, (u8 *) "x : ");
+    usart_write_byte(usart_1, BUF[0]);
+    usart_write_str(usart_1, (u8 *) "  |  ");
+
+    usart_write_str(usart_1, (u8 *) "y : ");
+    usart_write_byte(usart_1, BUF[1]);
+    usart_write_str(usart_1, (u8 *) "\n");
+    
+    nrf24l01_write_tx(RF, BUF, 3);
+
+    do{
+      nrf24l01_write(RF, NRF24L01_NOP, NULL, 0);
+    }while(!NRF24L01_DATA_SENT(RF->status));
+
+    f10xxx_timer_set_autoreload(timer_2, 50000);
+    f10xxx_timer_start(timer_2, one_pulse, upcounter);
+  }
+}
